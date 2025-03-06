@@ -5,6 +5,11 @@ from time import time
 from sys import exit
 from bs4 import BeautifulSoup
 from colorama import Fore, Style, init
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize colorama once
 init()
@@ -23,11 +28,8 @@ IN_STOCK_MSG = f"{Fore.GREEN}{{gpu}} at {{vendor}} is {{status}}{Style.RESET_ALL
 OUT_STOCK_MSG = f"{Fore.RED}{{gpu}} at {{vendor}} is {{status}}{Style.RESET_ALL}"
 
 # Configuration  
-discord_webhook_url = 'https://discord.com/api/webhooks/1334604131536736276/__rNWIMxU9RzhvSvonZricsITIZhOveGcCt_L12fO-d52INcsOQbJrWRr0VO_DaJGymw'
-discord_user_ids = [
-    '142106380764053504',  # Slippy D
-    '134718395798126592'   # Frantik
-]
+discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+discord_user_ids = os.getenv('DISCORD_USER_IDS', '').split(',')
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 }
