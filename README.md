@@ -18,11 +18,11 @@ DISCORD_WEBHOOK_URL=12345678
 DISCORD_USER_IDS=123,987 (supports multiple separated by comma)
 
 # GPU Configuration
-GPU_1_NAME=Product name
-GPU_1_URL=https://www.bestbuy.com/site/...
+PRODUCT_1_NAME=Product name
+PRODUCT_1_URL=https://www.bestbuy.com/site/...
 
-GPU_2_NAME=Product name
-GPU_2_URL=https://www.bestbuy.com/site/...
+PRODUCT_2_NAME=Product name
+PRODUCT_2_URL=https://www.bestbuy.com/site/...
 
 ...add as many as you'd like
 ```
