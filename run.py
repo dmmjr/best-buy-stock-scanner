@@ -16,6 +16,9 @@ import http.cookies
 # Import settings
 from settings import *
 
+# Import the UA generator - fix the import path
+import ua_generator
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -44,20 +47,50 @@ else:
 discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
 discord_user_ids = os.getenv('DISCORD_USER_IDS', '').split(',')
 
-# Load user agents from the JSON file
+# Define user agents file path
+USER_AGENTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'user_agents.json')
+
+# Load user agents dynamically
 def load_user_agents():
+    """Load user agents from file or generate them if needed"""
     try:
+        # Try to load from file first
         if os.path.exists(USER_AGENTS_FILE):
             with open(USER_AGENTS_FILE, 'r') as f:
                 agents = json.load(f)
-                logger.info(f"Loaded {len(agents)} user agents from {USER_AGENTS_FILE}")
-                return agents
-        else:
-            logger.warning(f"User agents file {USER_AGENTS_FILE} not found. This is required for the application to work.")
-            exit(1)
+                if agents and len(agents) >= UA_POOL_SIZE:
+                    logger.info(f"Loaded {len(agents)} user agents from {USER_AGENTS_FILE}")
+                    return agents
+                else:
+                    logger.info(f"Found user agents file but it contains insufficient agents ({len(agents) if agents else 0}), generating new pool")
+        
+        # Generate a pool of user agents
+        count = UA_POOL_SIZE
+        agents = ua_generator.generate_user_agents(count, include_mobile=INCLUDE_MOBILE_UAS)
+        logger.info(f"Generated {len(agents)} user agents dynamically")
+        
+        # Save to file for future use
+        save_user_agents(agents)
+        
+        return agents
     except Exception as e:
-        logger.error(f"Error loading user agents: {e}")
-        exit(1)
+        logger.error(f"Error with user agents: {e}")
+        # Fallback to a few basic user agents
+        logger.info("Using fallback user agents")
+        return [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15"
+        ]
+
+def save_user_agents(agents):
+    """Save user agents to a file for reuse"""
+    try:
+        with open(USER_AGENTS_FILE, 'w') as f:
+            json.dump(agents, f)
+        logger.info(f"Saved {len(agents)} user agents to {USER_AGENTS_FILE}")
+    except Exception as e:
+        logger.error(f"Error saving user agents: {e}")
 
 # Load header templates from the JSON file
 def load_headers():
@@ -80,6 +113,19 @@ HEADERS = load_headers()
 
 def get_random_headers(header_type="common"):
     """Generate headers with randomized values to appear more human-like"""
+    # Generate a fresh user agent or use one from the pool
+    if random.random() < FRESH_UA_CHANCE:  # Chance to use a freshly generated UA
+        user_agent = ua_generator.get_random_user_agent(include_mobile=INCLUDE_MOBILE_UAS)
+        # Add newly generated user agent to our pool occasionally
+        if len(USER_AGENTS) < UA_POOL_SIZE * 1.5:  # Limit growth of the pool
+            USER_AGENTS.append(user_agent)
+            # Periodically save back to file when we add new ones
+            if random.random() < 0.1:  # 10% chance to save on new addition
+                save_user_agents(USER_AGENTS)
+    else:
+        # Use one from our pre-generated pool
+        user_agent = random.choice(USER_AGENTS)
+    
     # Only apply randomization if enabled in settings
     if not RANDOMIZE_HEADERS:
         if header_type in HEADERS:
@@ -87,8 +133,8 @@ def get_random_headers(header_type="common"):
         else:
             headers = HEADERS["common"].copy()
         
-        # Add a random user agent
-        headers["User-Agent"] = random.choice(USER_AGENTS)
+        # Add the user agent
+        headers["User-Agent"] = user_agent
         return headers
     
     # Get the base headers template
@@ -98,7 +144,6 @@ def get_random_headers(header_type="common"):
         headers = HEADERS["common"].copy()
     
     # Add the user agent
-    user_agent = random.choice(USER_AGENTS)
     headers["User-Agent"] = user_agent
     
     # Get the randomization options

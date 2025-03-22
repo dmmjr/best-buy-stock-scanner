@@ -3,7 +3,5 @@ __pycache__/
 .env
 
 # Files
-/stock_Scanner.log
 /log.txt
-/bestbuy_cookies.json
 /cookies.json

@@ -2,7 +2,6 @@ from colorama import Fore, Style
 
 # File paths
 COOKIES_FILE = 'cookies.json'
-USER_AGENTS_FILE = 'user_agents.json'
 HEADERS_FILE = 'headers.json'
 LOG_FILE = 'log.txt'  # Renamed from stock_scanner.log to log.txt
 
@@ -13,6 +12,11 @@ LOGGING_LEVEL = 'INFO'  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 # Request settings
 REQUEST_TIMEOUT = 15  # Increased timeout for slow connections
 RANDOMIZE_HEADERS = True  # Enable deep header randomization
+
+# User agent settings
+UA_POOL_SIZE = 50        # Number of user agents to pre-generate
+FRESH_UA_CHANCE = 0.3    # 30% chance to generate a fresh UA for each request
+INCLUDE_MOBILE_UAS = True  # Whether to include mobile user agents
 
 # Timing settings
 DEFAULT_DELAY = 30    # Default delay between checks (seconds)
