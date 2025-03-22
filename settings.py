@@ -1,7 +1,7 @@
 from colorama import Fore, Style
 
 # File paths
-COOKIES_FILE = 'bestbuy_cookies.json'
+COOKIES_FILE = 'cookies.json'
 USER_AGENTS_FILE = 'user_agents.json'
 HEADERS_FILE = 'headers.json'
 LOG_FILE = 'log.txt'  # Renamed from stock_scanner.log to log.txt
