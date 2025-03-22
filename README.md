@@ -1,5 +1,7 @@
 A web scraper that scans specific product pages at Bestbuy.com, and notifies you via Discord when they are in stock.
 
+Built on [Python 3.13.1](https://www.python.org/downloads/release/python-3131/)
+
 # Create and activate virtual environment
 ```
 python -m venv venv
