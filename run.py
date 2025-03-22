@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 import asyncio
 import aiohttp
-from yarl import URL  # Add this import
+from yarl import URL
 import random
 import json
 from datetime import datetime
@@ -12,6 +12,9 @@ from bs4 import BeautifulSoup
 from colorama import Fore, Style, init
 import logging
 import http.cookies
+
+# Import settings
+from settings import *
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,27 +27,11 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("stock_scanner.log"),
+        logging.FileHandler(LOG_FILE),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger("stock_scanner")
-
-# Constants
-REQUEST_TIMEOUT = 15  # Increased timeout
-DEFAULT_DELAY = 30
-INSTOCK_DELAY = 5
-MAX_RETRIES = 3
-CACHE_TTL = 30  # Reduced cache TTL for fresher content
-COOKIES_FILE = 'bestbuy_cookies.json'
-USER_AGENTS_FILE = 'user_agents.json'
-HEADERS_FILE = 'headers.json'
-
-# Pre-formatted strings
-TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
-TIME_PREFIX = f"{Fore.LIGHTBLACK_EX}{{timestamp}}{Style.RESET_ALL}"
-IN_STOCK_MSG = f"{Fore.GREEN}{{product}} is {{status}}{Style.RESET_ALL}"
-OUT_STOCK_MSG = f"{Fore.RED}{{product}} is {{status}}{Style.RESET_ALL}"
 
 # Configuration  
 discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
@@ -151,15 +138,8 @@ for i in range(1, 10):  # Support up to 9 products
 
 # If no products defined in env vars, use defaults
 if not products:
-    logger.warning("No products defined in environment variables. Using defaults.")
-    products = { 
-        'RTX 5090 FE': {
-            'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151',
-        },
-        'RTX 5080 FE': {
-            'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5080-16gb-gddr7-graphics-card-gun-metal/6614153.p?skuId=6614153',
-        }
-    }
+    logger.warning("No products defined in environment variables. At least one product is required.")
+    exit(1)
 
 # Extract SKU IDs for tracking
 for product_name, product_info in products.items():
@@ -237,13 +217,10 @@ async def check_availability(product_name, product_info, session):
                     soup = BeautifulSoup(html_content, 'html.parser')
                     html_cache[url] = {'soup': soup, 'timestamp': time()}
                     
-                    # Try multiple button selectors
-                    selectors = [
-                        'button.add-to-cart-button',
-                        'button[data-button-state="ADD_TO_CART"]',
-                        '.add-to-cart-button',
-                        f'[data-sku-id="{sku_id}"] button' if sku_id else None
-                    ]
+                    # Create button selectors including the SKU-specific one
+                    selectors = BUTTON_SELECTORS.copy()
+                    if sku_id:
+                        selectors.append(f'[data-sku-id="{sku_id}"] button')
                     
                     for selector in selectors:
                         if not selector:
@@ -264,18 +241,16 @@ async def check_availability(product_name, product_info, session):
                                 break
                     
                     # Check for CloudFlare or other protection mechanisms
-                    if not button_found and (
-                        soup.select_one('#challenge-running') or
-                        soup.select_one('.cf-browser-verification') or
-                        'CF-' in str(response.headers) or
-                        'captcha' in html_content.lower()
-                    ):
-                        logger.warning(f"Detected protection mechanism for {product_name}. Consider using a proxy or reducing request frequency.")
+                    if not button_found:
+                        for indicator in PROTECTION_INDICATORS:
+                            if soup.select_one(indicator) or 'CF-' in str(response.headers) or 'captcha' in html_content.lower():
+                                logger.warning(f"Detected protection mechanism for {product_name}. Consider using a proxy or reducing request frequency.")
+                                break
                     
                     # If no button found, try looking for text patterns
                     if not button_found:
                         # Look for availability text in the page
-                        for availability_selector in ['.fulfillment-add-to-cart-button', '.priceView-hero-price', '.priceView-customer-price']:
+                        for availability_selector in TEXT_SELECTORS:
                             availability_element = soup.select_one(availability_selector)
                             if availability_element:
                                 text = availability_element.text.strip().upper()
@@ -294,11 +269,6 @@ async def check_availability(product_name, product_info, session):
                 logger.error(f"HTTP error: {response.status} when accessing {url}")
         
         if not button_found:
-            all_buttons = html_cache.get(url, {}).get('soup', BeautifulSoup('', 'html.parser')).find_all('button')
-            logger.warning(f"Found {len(all_buttons)} buttons on the page. First few buttons:")
-            for i, btn in enumerate(all_buttons[:5]):
-                logger.warning(f"Button {i+1}: {btn.get('class', 'No class')} - Text: {btn.text.strip()}")
-            
             raise ValueError("Add to cart button not found with any selector")
         
         # Process stock status changes
@@ -363,7 +333,7 @@ async def main_async():
     jar = aiohttp.CookieJar()
     
     # Create a base URL object
-    base_url = URL('https://www.bestbuy.com')
+    base_url = URL(BASE_URL)
     
     # Add cookies to the jar with proper URL object
     for name, value in cookies_dict.items():
@@ -380,7 +350,7 @@ async def main_async():
             # First make a warmup request to the main site to get cookies
             try:
                 await asyncio.sleep(random.uniform(1.0, 3.0))
-                async with session.get('https://www.bestbuy.com', headers=get_random_headers(), timeout=REQUEST_TIMEOUT) as response:
+                async with session.get(BASE_URL, headers=get_random_headers(), timeout=REQUEST_TIMEOUT) as response:
                     if response.status == 200:
                         new_cookies = extract_cookies_from_response(response)
                         update_session_cookies(session, new_cookies)
@@ -418,13 +388,13 @@ async def main_async():
                 
                 # Run all checks with some concurrency control
                 if tasks:
-                    # Run checks with some concurrency control (3 at a time)
-                    for i in range(0, len(tasks), 3):
-                        batch = tasks[i:i+3]
+                    # Run checks with some concurrency control
+                    for i in range(0, len(tasks), BATCH_SIZE):
+                        batch = tasks[i:i+BATCH_SIZE]
                         await asyncio.gather(*batch)
-                        if i + 3 < len(tasks):
+                        if i + BATCH_SIZE < len(tasks):
                             # Add small delay between batches
-                            await asyncio.sleep(random.uniform(2.0, 5.0))
+                            await asyncio.sleep(random.uniform(BATCH_DELAY_MIN, BATCH_DELAY_MAX))
                     
         except KeyboardInterrupt:
             logger.info("\n\nExiting checker...")
