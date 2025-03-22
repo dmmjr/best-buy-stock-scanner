@@ -219,3 +219,40 @@ Press Ctrl+C to exit
 2025-03-22 12:03:21,014 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
 2025-03-22 12:03:22,353 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
 2025-03-22 12:03:22,356 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:22,768 - INFO - Loaded 14 user agents from user_agents.json
+2025-03-22 12:09:22,768 - INFO - Loaded header templates from headers.json
+2025-03-22 12:09:22,769 - INFO - Starting Best Buy product availability checker...
+Press Ctrl+C to exit
+
+2025-03-22 12:09:22,769 - INFO - Tracking 2 products:
+2025-03-22 12:09:22,769 - INFO -   - RTX 5090 FE: https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151
+2025-03-22 12:09:22,769 - INFO -   - RTX 5080 FE: https://www.bestbuy.com/site/nvidia-geforce-rtx-5080-16gb-gddr7-graphics-card-gun-metal/6614153.p?skuId=6614153
+2025-03-22 12:09:25,901 - INFO - Initialized session with cookies from bestbuy.com
+2025-03-22 12:09:28,700 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:28,703 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:29,576 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:29,579 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:59,304 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:59,307 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:59,733 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:09:59,736 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:10:27,927 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:10:27,930 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:10:28,945 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:10:28,948 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:10:58,542 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:10:58,544 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:00,068 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:00,070 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:29,020 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:29,023 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:29,174 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:29,176 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:58,934 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:11:58,937 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:12:01,393 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:12:01,396 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:12:28,594 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:12:28,597 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:12:29,415 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 12:12:29,418 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True

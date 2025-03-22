@@ -1,2 +1,4 @@
 .venv
 .env
+stock_Scanner.log
+bestbuy_cookies.json
