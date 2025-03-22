@@ -1,10 +1,10 @@
-A script to scan specific product pages at Bestbuy.com, and notify you when they come back in stock.
+A web scraper that scans specific product pages at Bestbuy.com, and notifies you via Discord when they are in stock.
 
 # Create and activate virtual environment
 ```
 python -m venv venv
 venv\Scripts\activate
-```
+```S
 
 # Install requirements
 ```
