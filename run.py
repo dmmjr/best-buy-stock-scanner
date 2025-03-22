@@ -195,11 +195,11 @@ async def check_availability(gpu_name, gpu_info, session):
         # Use fresh headers for each request
         request_headers = get_random_headers()
         
-        # Try multiple methods to check availability
+        # Try to check availability
         is_in_stock = False
         button_found = False
         
-        # Method 1: Scrape the product page with standard approach
+        # Scrape the product page with standard approach
         async with session.get(url, headers=request_headers, timeout=REQUEST_TIMEOUT) as response:
             if response.status == 200:
                 html_content = await response.text()
@@ -274,32 +274,6 @@ async def check_availability(gpu_name, gpu_info, session):
                 return  # Exit early to avoid further processing
             else:
                 logger.error(f"HTTP error: {response.status} when accessing {url}")
-        
-        # Method 2: If scraping failed, try the API approach
-        if not button_found and sku_id:
-            api_url = f"https://www.bestbuy.com/api/tcfb/model.json?paths=%5B%5B%22shop%22%2C%22buttonstate%22%2C%22v5%22%2C%22item%22%2C%22skus%22%2C{sku_id}%2C%22conditions%22%2C%22NONE%22%2C%22destinationZipCode%22%2C%22NONE%22%2C%22storeId%22%2C%22NONE%22%2C%22context%22%2C%22NONE%22%2C%22addAll%22%2C%22false%22%5D%5D&method=get"
-            
-            try:
-                api_headers = get_random_headers()
-                api_headers['Accept'] = 'application/json'
-                
-                await asyncio.sleep(random.uniform(0.5, 1.5))  # Small delay between requests
-                
-                async with session.get(api_url, headers=api_headers, timeout=REQUEST_TIMEOUT) as api_response:
-                    if api_response.status == 200:
-                        api_data = await api_response.json()
-                        # Parse the API response to determine stock status
-                        if 'jsonGraph' in api_data and 'buttonstate' in api_data['jsonGraph']:
-                            button_state_data = api_data['jsonGraph']['buttonstate']
-                            for key, value in button_state_data.items():
-                                if sku_id in key and 'buttonstate' in key:
-                                    if value.get('value') == 'ADD_TO_CART':
-                                        is_in_stock = True
-                                        button_found = True
-                                        logger.info(f"API check indicates {gpu_name} is in stock")
-                                    break
-            except Exception as api_error:
-                logger.error(f"API check failed: {str(api_error)}")
         
         if not button_found:
             all_buttons = html_cache.get(url, {}).get('soup', BeautifulSoup('', 'html.parser')).find_all('button')
