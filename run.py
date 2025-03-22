@@ -38,48 +38,66 @@ MAX_RETRIES = 3
 CACHE_TTL = 30  # Reduced cache TTL for fresher content
 COOKIES_FILE = 'bestbuy_cookies.json'
 USER_AGENTS_FILE = 'user_agents.json'
+HEADERS_FILE = 'headers.json'
 
 # Pre-formatted strings
 TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
 TIME_PREFIX = f"{Fore.LIGHTBLACK_EX}{{timestamp}}{Style.RESET_ALL}"
-IN_STOCK_MSG = f"{Fore.GREEN}{{gpu}} is {{status}}{Style.RESET_ALL}"
-OUT_STOCK_MSG = f"{Fore.RED}{{gpu}} is {{status}}{Style.RESET_ALL}"
+IN_STOCK_MSG = f"{Fore.GREEN}{{product}} is {{status}}{Style.RESET_ALL}"
+OUT_STOCK_MSG = f"{Fore.RED}{{product}} is {{status}}{Style.RESET_ALL}"
 
 # Configuration  
 discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
 discord_user_ids = os.getenv('DISCORD_USER_IDS', '').split(',')
 
-# Rotating user agents to avoid detection
-USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/123.0.0.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-]
+# Load user agents from the JSON file
+def load_user_agents():
+    try:
+        if os.path.exists(USER_AGENTS_FILE):
+            with open(USER_AGENTS_FILE, 'r') as f:
+                agents = json.load(f)
+                logger.info(f"Loaded {len(agents)} user agents from {USER_AGENTS_FILE}")
+                return agents
+        else:
+            logger.warning(f"User agents file {USER_AGENTS_FILE} not found. This is required for the application to work.")
+            exit(1)
+    except Exception as e:
+        logger.error(f"Error loading user agents: {e}")
+        exit(1)
 
-def get_random_headers():
-    """Generate random headers to mimic different browsers"""
+# Load header templates from the JSON file
+def load_headers():
+    try:
+        if os.path.exists(HEADERS_FILE):
+            with open(HEADERS_FILE, 'r') as f:
+                headers = json.load(f)
+                logger.info(f"Loaded header templates from {HEADERS_FILE}")
+                return headers
+        else:
+            logger.error(f"Headers file {HEADERS_FILE} not found. This is required for the application to work.")
+            exit(1)
+    except Exception as e:
+        logger.error(f"Error loading headers: {e}")
+        exit(1)
+
+# Load user agents and headers
+USER_AGENTS = load_user_agents()
+HEADERS = load_headers()
+
+def get_random_headers(header_type="common"):
+    """Generate headers with a random user agent"""
     user_agent = random.choice(USER_AGENTS)
-    return {
-        'User-Agent': user_agent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Referer': 'https://www.bestbuy.com/',
-        'sec-ch-ua': '"Chromium";v="120", "Google Chrome";v="120"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'Upgrade-Insecure-Requests': '1',
-        'sec-fetch-site': 'same-origin',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-dest': 'document',
-        'Cache-Control': 'max-age=0',
-        'Connection': 'keep-alive'
-    }
+    
+    # Get the base headers template
+    if header_type in HEADERS:
+        headers = HEADERS[header_type].copy()
+    else:
+        headers = HEADERS["common"].copy()
+    
+    # Add the user agent
+    headers["User-Agent"] = user_agent
+    
+    return headers
 
 # Cookie management functions
 def save_cookies(cookies_dict):
@@ -118,23 +136,23 @@ def update_session_cookies(session, new_cookies):
     for name, value in new_cookies.items():
         session.cookie_jar.update_cookies({name: value})
 
-# GPU tracking from environment variables
-gpus = {}
+# Product tracking from environment variables
+products = {}
 
-# Parse GPU environment variables
-for i in range(1, 10):  # Support up to 9 GPUs
-    gpu_name = os.getenv(f'GPU_{i}_NAME')
-    gpu_url = os.getenv(f'GPU_{i}_URL')
+# Parse product environment variables
+for i in range(1, 10):  # Support up to 9 products
+    product_name = os.getenv(f'PRODUCT_{i}_NAME')
+    product_url = os.getenv(f'PRODUCT_{i}_URL')
     
-    if gpu_name and gpu_url:
-        gpus[gpu_name] = {
-            'url': gpu_url,
+    if product_name and product_url:
+        products[product_name] = {
+            'url': product_url,
         }
 
-# If no GPUs defined in env vars, use defaults
-if not gpus:
-    logger.warning("No GPUs defined in environment variables. Using defaults.")
-    gpus = { 
+# If no products defined in env vars, use defaults
+if not products:
+    logger.warning("No products defined in environment variables. Using defaults.")
+    products = { 
         'RTX 5090 FE': {
             'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151',
         },
@@ -143,33 +161,33 @@ if not gpus:
         }
     }
 
-# Extract SKU IDs for API access
-for gpu_name, gpu_info in gpus.items():
-    url = gpu_info['url']
+# Extract SKU IDs for tracking
+for product_name, product_info in products.items():
+    url = product_info['url']
     sku_id = url.split('skuId=')[1].split('&')[0] if 'skuId=' in url else None
-    gpus[gpu_name]['sku_id'] = sku_id
+    products[product_name]['sku_id'] = sku_id
 
-gpu_stock_status = {gpu: False for gpu in gpus}
-gpu_stock_times = {}
-gpu_check_delays = {gpu: DEFAULT_DELAY for gpu in gpus}
-retry_counts = {gpu: 0 for gpu in gpus}
+product_stock_status = {product: False for product in products}
+product_stock_times = {}
+product_check_delays = {product: DEFAULT_DELAY for product in products}
+retry_counts = {product: 0 for product in products}
 html_cache = {}  # Store HTML content to avoid re-parsing
 
-async def send_discord_notification(gpu_name, url, in_stock=True, duration=None):
+async def send_discord_notification(product_name, url, in_stock=True, duration=None):
     current_time = datetime.now().strftime(TIMESTAMP_FORMAT)
     user_pings = ' '.join([f'<@{user_id}>' for user_id in discord_user_ids])
     
     # Fix the message construction with proper string formatting
     if in_stock:
         message = (
-            f"## {gpu_name} is IN STOCK!\n"
+            f"## {product_name} is IN STOCK!\n"
             f"-# {current_time}\n"
             f"[product page]({url})\n"
             f"{user_pings}"
         )
     else:
         message = (
-            f"## {gpu_name} is OUT OF STOCK\n"
+            f"## {product_name} is OUT OF STOCK\n"
             f"-# {current_time}\n"
             f"It was in stock for: {str(duration).split('.')[0]}"
         )
@@ -182,9 +200,9 @@ async def send_discord_notification(gpu_name, url, in_stock=True, duration=None)
         print(f"Error sending Discord notification: {str(e)}")
         return False
 
-async def check_availability(gpu_name, gpu_info, session):
-    url = gpu_info['url']
-    sku_id = gpu_info.get('sku_id')
+async def check_availability(product_name, product_info, session):
+    url = product_info['url']
+    sku_id = product_info.get('sku_id')
     current_time = datetime.now()
     formatted_time = current_time.strftime(TIMESTAMP_FORMAT)
     
@@ -252,7 +270,7 @@ async def check_availability(gpu_name, gpu_info, session):
                         'CF-' in str(response.headers) or
                         'captcha' in html_content.lower()
                     ):
-                        logger.warning(f"Detected protection mechanism for {gpu_name}. Consider using a proxy or reducing request frequency.")
+                        logger.warning(f"Detected protection mechanism for {product_name}. Consider using a proxy or reducing request frequency.")
                     
                     # If no button found, try looking for text patterns
                     if not button_found:
@@ -269,8 +287,8 @@ async def check_availability(gpu_name, gpu_info, session):
                     logger.error(f"Error parsing HTML: {parse_error}")
             elif response.status == 429 or response.status == 403:
                 logger.warning(f"Received status {response.status} - Rate limited or blocked. Backing off...")
-                retry_counts[gpu_name] += 1
-                gpu_check_delays[gpu_name] = min(300, DEFAULT_DELAY * (2 ** min(retry_counts[gpu_name], 5)))
+                retry_counts[product_name] += 1
+                product_check_delays[product_name] = min(300, DEFAULT_DELAY * (2 ** min(retry_counts[product_name], 5)))
                 return  # Exit early to avoid further processing
             else:
                 logger.error(f"HTTP error: {response.status} when accessing {url}")
@@ -285,42 +303,42 @@ async def check_availability(gpu_name, gpu_info, session):
         
         # Process stock status changes
         if is_in_stock:
-            if not gpu_stock_status[gpu_name]:
-                gpu_stock_status[gpu_name] = True
-                gpu_stock_times[gpu_name] = current_time
-                gpu_check_delays[gpu_name] = INSTOCK_DELAY
-                await send_discord_notification(gpu_name, url)
+            if not product_stock_status[product_name]:
+                product_stock_status[product_name] = True
+                product_stock_times[product_name] = current_time
+                product_check_delays[product_name] = INSTOCK_DELAY
+                await send_discord_notification(product_name, url)
             status = "IN STOCK!!!"
             msg_template = IN_STOCK_MSG
         else:
-            if gpu_stock_status[gpu_name]:
-                duration = current_time - gpu_stock_times[gpu_name]
-                gpu_stock_status[gpu_name] = False
-                gpu_check_delays[gpu_name] = DEFAULT_DELAY
-                await send_discord_notification(gpu_name, url, False, duration)
+            if product_stock_status[product_name]:
+                duration = current_time - product_stock_times[product_name]
+                product_stock_status[product_name] = False
+                product_check_delays[product_name] = DEFAULT_DELAY
+                await send_discord_notification(product_name, url, False, duration)
             status = "OUT OF STOCK..."
             msg_template = OUT_STOCK_MSG
         
         print(f"[{TIME_PREFIX}] {msg_template}".format(
             timestamp=formatted_time,
-            gpu=gpu_name,
+            product=product_name,
             status=status
         ))
         
         # Reset retry count on success
-        retry_counts[gpu_name] = 0
+        retry_counts[product_name] = 0
         
     except Exception as e:
         # Improved error handling
-        retry_counts[gpu_name] += 1
-        backoff_delay = min(120, DEFAULT_DELAY * (2 ** min(retry_counts[gpu_name], 4)))
-        gpu_check_delays[gpu_name] = backoff_delay
-        logger.error(f"Error checking {gpu_name}: {str(e)}. Retrying in {backoff_delay}s")
+        retry_counts[product_name] += 1
+        backoff_delay = min(120, DEFAULT_DELAY * (2 ** min(retry_counts[product_name], 4)))
+        product_check_delays[product_name] = backoff_delay
+        logger.error(f"Error checking {product_name}: {str(e)}. Retrying in {backoff_delay}s")
         
         # If we've failed multiple times, try to save the HTML for debugging
-        if retry_counts[gpu_name] >= MAX_RETRIES:
+        if retry_counts[product_name] >= MAX_RETRIES:
             try:
-                debug_file = f"debug_{gpu_name.replace(' ', '_')}_{int(time())}.html"
+                debug_file = f"debug_{product_name.replace(' ', '_')}_{int(time())}.html"
                 with open(debug_file, 'w', encoding='utf-8') as f:
                     if url in html_cache:
                         f.write(str(html_cache[url]['soup']))
@@ -329,14 +347,14 @@ async def check_availability(gpu_name, gpu_info, session):
                 logger.error(f"Could not save debug HTML: {save_error}")
 
 async def main_async():
-    logger.info("Starting Best Buy GPU availability checker...\nPress Ctrl+C to exit\n")
+    logger.info("Starting Best Buy product availability checker...\nPress Ctrl+C to exit\n")
     
-    # Log the GPUs we're tracking
-    logger.info(f"Tracking {len(gpus)} GPUs:")
-    for name, info in gpus.items():
+    # Log the products we're tracking
+    logger.info(f"Tracking {len(products)} products:")
+    for name, info in products.items():
         logger.info(f"  - {name}: {info['url']}")
     
-    last_check = {gpu: 0 for gpu in gpus}
+    last_check = {product: 0 for product in products}
     
     # Load saved cookies
     cookies_dict = load_cookies()
@@ -377,10 +395,10 @@ async def main_async():
             while True:
                 current_time = time()
                 
-                # Find next GPU to check
+                # Find next product to check
                 next_check_time = float('inf')
-                for gpu_name in gpus:
-                    check_time = last_check[gpu_name] + gpu_check_delays[gpu_name]
+                for product_name in products:
+                    check_time = last_check[product_name] + product_check_delays[product_name]
                     if check_time < next_check_time:
                         next_check_time = check_time
                 
@@ -389,14 +407,14 @@ async def main_async():
                 if (sleep_time > 0):
                     await asyncio.sleep(sleep_time)
                 
-                # Check which GPUs need processing
+                # Check which products need processing
                 current_time = time()
                 tasks = []
                 
-                for gpu_name, gpu_info in gpus.items():
-                    if current_time >= last_check[gpu_name] + gpu_check_delays[gpu_name]:
-                        tasks.append(check_availability(gpu_name, gpu_info, session))
-                        last_check[gpu_name] = current_time
+                for product_name, product_info in products.items():
+                    if current_time >= last_check[product_name] + product_check_delays[product_name]:
+                        tasks.append(check_availability(product_name, product_info, session))
+                        last_check[product_name] = current_time
                 
                 # Run all checks with some concurrency control
                 if tasks:

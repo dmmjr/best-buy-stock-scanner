@@ -183,3 +183,26 @@ Press Ctrl+C to exit
 2025-03-22 11:03:13,790 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
 2025-03-22 11:03:14,977 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
 2025-03-22 11:03:14,980 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:33:54,400 - INFO - Starting Best Buy product availability checker...
+Press Ctrl+C to exit
+
+2025-03-22 11:33:54,400 - INFO - Tracking 2 products:
+2025-03-22 11:33:54,401 - INFO -   - RTX 5090 FE: https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151
+2025-03-22 11:33:54,401 - INFO -   - RTX 5080 FE: https://www.bestbuy.com/site/nvidia-geforce-rtx-5080-16gb-gddr7-graphics-card-gun-metal/6614153.p?skuId=6614153
+2025-03-22 11:33:57,498 - INFO - Initialized session with cookies from bestbuy.com
+2025-03-22 11:33:59,592 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:33:59,594 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:33:59,726 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:33:59,729 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:37:15,906 - INFO - Loaded 14 user agents from user_agents.json
+2025-03-22 11:37:15,907 - INFO - Starting Best Buy product availability checker...
+Press Ctrl+C to exit
+
+2025-03-22 11:37:15,907 - INFO - Tracking 2 products:
+2025-03-22 11:37:15,907 - INFO -   - RTX 5090 FE: https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151
+2025-03-22 11:37:15,907 - INFO -   - RTX 5080 FE: https://www.bestbuy.com/site/nvidia-geforce-rtx-5080-16gb-gddr7-graphics-card-gun-metal/6614153.p?skuId=6614153
+2025-03-22 11:37:18,762 - INFO - Initialized session with cookies from bestbuy.com
+2025-03-22 11:37:22,025 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:37:22,028 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:37:22,365 - INFO - Found button with selector 'button.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
+2025-03-22 11:37:22,368 - INFO - Found button with selector '.add-to-cart-button'. Text: 'SOLD OUT', State: 'SOLD_OUT', Disabled: True
