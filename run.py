@@ -42,8 +42,8 @@ USER_AGENTS_FILE = 'user_agents.json'
 # Pre-formatted strings
 TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
 TIME_PREFIX = f"{Fore.LIGHTBLACK_EX}{{timestamp}}{Style.RESET_ALL}"
-IN_STOCK_MSG = f"{Fore.GREEN}{{gpu}} at {{vendor}} is {{status}}{Style.RESET_ALL}"
-OUT_STOCK_MSG = f"{Fore.RED}{{gpu}} at {{vendor}} is {{status}}{Style.RESET_ALL}"
+IN_STOCK_MSG = f"{Fore.GREEN}{{gpu}} is {{status}}{Style.RESET_ALL}"
+OUT_STOCK_MSG = f"{Fore.RED}{{gpu}} is {{status}}{Style.RESET_ALL}"
 
 # Configuration  
 discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
@@ -118,19 +118,30 @@ def update_session_cookies(session, new_cookies):
     for name, value in new_cookies.items():
         session.cookie_jar.update_cookies({name: value})
 
-VENDOR_BESTBUY = 'Best Buy'
+# GPU tracking from environment variables
+gpus = {}
 
-# GPU tracking
-gpus = { 
-     'RTX 5090 FE': {
-        'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151',
-        'vendor': VENDOR_BESTBUY
-    },
-    'RTX 5080 FE': {
-        'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5080-16gb-gddr7-graphics-card-gun-metal/6614153.p?skuId=6614153',
-        'vendor': VENDOR_BESTBUY
-   }
-}
+# Parse GPU environment variables
+for i in range(1, 10):  # Support up to 9 GPUs
+    gpu_name = os.getenv(f'GPU_{i}_NAME')
+    gpu_url = os.getenv(f'GPU_{i}_URL')
+    
+    if gpu_name and gpu_url:
+        gpus[gpu_name] = {
+            'url': gpu_url,
+        }
+
+# If no GPUs defined in env vars, use defaults
+if not gpus:
+    logger.warning("No GPUs defined in environment variables. Using defaults.")
+    gpus = { 
+        'RTX 5090 FE': {
+            'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151',
+        },
+        'RTX 5080 FE': {
+            'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5080-16gb-gddr7-graphics-card-gun-metal/6614153.p?skuId=6614153',
+        }
+    }
 
 # Extract SKU IDs for API access
 for gpu_name, gpu_info in gpus.items():
@@ -144,21 +155,21 @@ gpu_check_delays = {gpu: DEFAULT_DELAY for gpu in gpus}
 retry_counts = {gpu: 0 for gpu in gpus}
 html_cache = {}  # Store HTML content to avoid re-parsing
 
-async def send_discord_notification(gpu_name, vendor, url, in_stock=True, duration=None):
+async def send_discord_notification(gpu_name, url, in_stock=True, duration=None):
     current_time = datetime.now().strftime(TIMESTAMP_FORMAT)
     user_pings = ' '.join([f'<@{user_id}>' for user_id in discord_user_ids])
     
     # Fix the message construction with proper string formatting
     if in_stock:
         message = (
-            f"## {gpu_name} at {vendor} is IN STOCK!\n"
+            f"## {gpu_name} is IN STOCK!\n"
             f"-# {current_time}\n"
             f"[product page]({url})\n"
             f"{user_pings}"
         )
     else:
         message = (
-            f"## {gpu_name} at {vendor} is OUT OF STOCK\n"
+            f"## {gpu_name} is OUT OF STOCK\n"
             f"-# {current_time}\n"
             f"It was in stock for: {str(duration).split('.')[0]}"
         )
@@ -172,7 +183,7 @@ async def send_discord_notification(gpu_name, vendor, url, in_stock=True, durati
         return False
 
 async def check_availability(gpu_name, gpu_info, session):
-    url, vendor = gpu_info['url'], gpu_info['vendor']
+    url = gpu_info['url']
     sku_id = gpu_info.get('sku_id')
     current_time = datetime.now()
     formatted_time = current_time.strftime(TIMESTAMP_FORMAT)
@@ -304,7 +315,7 @@ async def check_availability(gpu_name, gpu_info, session):
                 gpu_stock_status[gpu_name] = True
                 gpu_stock_times[gpu_name] = current_time
                 gpu_check_delays[gpu_name] = INSTOCK_DELAY
-                await send_discord_notification(gpu_name, vendor, url)
+                await send_discord_notification(gpu_name, url)
             status = "IN STOCK!!!"
             msg_template = IN_STOCK_MSG
         else:
@@ -312,14 +323,13 @@ async def check_availability(gpu_name, gpu_info, session):
                 duration = current_time - gpu_stock_times[gpu_name]
                 gpu_stock_status[gpu_name] = False
                 gpu_check_delays[gpu_name] = DEFAULT_DELAY
-                await send_discord_notification(gpu_name, vendor, url, False, duration)
+                await send_discord_notification(gpu_name, url, False, duration)
             status = "OUT OF STOCK..."
             msg_template = OUT_STOCK_MSG
         
         print(f"[{TIME_PREFIX}] {msg_template}".format(
             timestamp=formatted_time,
             gpu=gpu_name,
-            vendor=vendor,
             status=status
         ))
         
@@ -345,7 +355,13 @@ async def check_availability(gpu_name, gpu_info, session):
                 logger.error(f"Could not save debug HTML: {save_error}")
 
 async def main_async():
-    logger.info("Starting NVIDIA GPU availability checker...\nPress Ctrl+C to exit\n")
+    logger.info("Starting Best Buy GPU availability checker...\nPress Ctrl+C to exit\n")
+    
+    # Log the GPUs we're tracking
+    logger.info(f"Tracking {len(gpus)} GPUs:")
+    for name, info in gpus.items():
+        logger.info(f"  - {name}: {info['url']}")
+    
     last_check = {gpu: 0 for gpu in gpus}
     
     # Load saved cookies
@@ -396,7 +412,7 @@ async def main_async():
                 
                 # Sleep until next check is due
                 sleep_time = max(0, next_check_time - current_time)
-                if sleep_time > 0:
+                if (sleep_time > 0):
                     await asyncio.sleep(sleep_time)
                 
                 # Check which GPUs need processing
