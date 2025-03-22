@@ -1,12 +1,17 @@
+import os
+from dotenv import load_dotenv
 import asyncio
 import aiohttp
+from yarl import URL  # Add this import
+import random
+import json
 from datetime import datetime
 from time import time
 from sys import exit
 from bs4 import BeautifulSoup
 from colorama import Fore, Style, init
-import os
-from dotenv import load_dotenv
+import logging
+import http.cookies
 
 # Load environment variables from .env file
 load_dotenv()
@@ -14,12 +19,25 @@ load_dotenv()
 # Initialize colorama once
 init()
 
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("stock_scanner.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("stock_scanner")
+
 # Constants
-REQUEST_TIMEOUT = 5
+REQUEST_TIMEOUT = 15  # Increased timeout
 DEFAULT_DELAY = 30
 INSTOCK_DELAY = 5
 MAX_RETRIES = 3
-CACHE_TTL = 60  # Seconds to keep HTML cache valid
+CACHE_TTL = 30  # Reduced cache TTL for fresher content
+COOKIES_FILE = 'bestbuy_cookies.json'
+USER_AGENTS_FILE = 'user_agents.json'
 
 # Pre-formatted strings
 TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -30,27 +48,96 @@ OUT_STOCK_MSG = f"{Fore.RED}{{gpu}} at {{vendor}} is {{status}}{Style.RESET_ALL}
 # Configuration  
 discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
 discord_user_ids = os.getenv('DISCORD_USER_IDS', '').split(',')
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-}
+
+# Rotating user agents to avoid detection
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/123.0.0.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+]
+
+def get_random_headers():
+    """Generate random headers to mimic different browsers"""
+    user_agent = random.choice(USER_AGENTS)
+    return {
+        'User-Agent': user_agent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://www.bestbuy.com/',
+        'sec-ch-ua': '"Chromium";v="120", "Google Chrome";v="120"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'Upgrade-Insecure-Requests': '1',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-dest': 'document',
+        'Cache-Control': 'max-age=0',
+        'Connection': 'keep-alive'
+    }
+
+# Cookie management functions
+def save_cookies(cookies_dict):
+    """Save cookies to a file"""
+    try:
+        with open(COOKIES_FILE, 'w') as f:
+            json.dump(cookies_dict, f)
+    except Exception as e:
+        logger.error(f"Error saving cookies: {e}")
+
+def load_cookies():
+    """Load cookies from a file"""
+    try:
+        if os.path.exists(COOKIES_FILE):
+            with open(COOKIES_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading cookies: {e}")
+    return {}
+
+def extract_cookies_from_response(response):
+    """Extract cookies from response headers"""
+    cookies_dict = {}
+    if 'Set-Cookie' in response.headers:
+        for cookie_str in response.headers.getall('Set-Cookie', []):
+            cookie = http.cookies.SimpleCookie()
+            cookie.load(cookie_str)
+            for key, morsel in cookie.items():
+                cookies_dict[key] = morsel.value
+    return cookies_dict
+
+def update_session_cookies(session, new_cookies):
+    """Update session cookies with new values"""
+    if not new_cookies:
+        return
+    for name, value in new_cookies.items():
+        session.cookie_jar.update_cookies({name: value})
 
 VENDOR_BESTBUY = 'Best Buy'
 
 # GPU tracking
-gpus = {
-    'RTX 5090 FE': {
+gpus = { 
+     'RTX 5090 FE': {
         'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5090-32gb-gddr7-graphics-card-dark-gun-metal/6614151.p?skuId=6614151',
         'vendor': VENDOR_BESTBUY
     },
     'RTX 5080 FE': {
         'url': 'https://www.bestbuy.com/site/nvidia-geforce-rtx-5080-16gb-gddr7-graphics-card-gun-metal/6614153.p?skuId=6614153',
         'vendor': VENDOR_BESTBUY
-   },
-   'RX 9070XT XFX': {
-        'url': 'https://www.bestbuy.com/site/xfx-swift-amd-radeon-rx-9070xt-16gb-gddr6-pci-express-5-0-gaming-graphics-card-black/6620455.p?skuId=6620455',
-        'vendor': VENDOR_BESTBUY
-   },
+   }
 }
+
+# Extract SKU IDs for API access
+for gpu_name, gpu_info in gpus.items():
+    url = gpu_info['url']
+    sku_id = url.split('skuId=')[1].split('&')[0] if 'skuId=' in url else None
+    gpus[gpu_name]['sku_id'] = sku_id
+
 gpu_stock_status = {gpu: False for gpu in gpus}
 gpu_stock_times = {}
 gpu_check_delays = {gpu: DEFAULT_DELAY for gpu in gpus}
@@ -86,28 +173,132 @@ async def send_discord_notification(gpu_name, vendor, url, in_stock=True, durati
 
 async def check_availability(gpu_name, gpu_info, session):
     url, vendor = gpu_info['url'], gpu_info['vendor']
+    sku_id = gpu_info.get('sku_id')
     current_time = datetime.now()
     formatted_time = current_time.strftime(TIMESTAMP_FORMAT)
     
     try:
-        # Check if we have a cached version
-        if url in html_cache and time() - html_cache[url]['timestamp'] < CACHE_TTL:
-            soup = html_cache[url]['soup']
-        else:
-            async with session.get(url, timeout=REQUEST_TIMEOUT) as response:
+        # Add random delay between 1 and 3 seconds to appear more human-like
+        await asyncio.sleep(random.uniform(1.0, 3.0))
+        
+        # Use fresh headers for each request
+        request_headers = get_random_headers()
+        
+        # Try multiple methods to check availability
+        is_in_stock = False
+        button_found = False
+        
+        # Method 1: Scrape the product page with standard approach
+        async with session.get(url, headers=request_headers, timeout=REQUEST_TIMEOUT) as response:
+            if response.status == 200:
                 html_content = await response.text()
-                soup = BeautifulSoup(html_content, 'html.parser')
-                html_cache[url] = {'soup': soup, 'timestamp': time()}
+                
+                # Update session cookies
+                new_cookies = extract_cookies_from_response(response)
+                update_session_cookies(session, new_cookies)
+                
+                # Store cookies for future sessions
+                all_cookies = {}
+                for cookie in session.cookie_jar:
+                    all_cookies[cookie.key] = cookie.value
+                save_cookies(all_cookies)
+                
+                # Parse HTML with error handling
+                try:
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    html_cache[url] = {'soup': soup, 'timestamp': time()}
+                    
+                    # Try multiple button selectors
+                    selectors = [
+                        'button.add-to-cart-button',
+                        'button[data-button-state="ADD_TO_CART"]',
+                        '.add-to-cart-button',
+                        f'[data-sku-id="{sku_id}"] button' if sku_id else None
+                    ]
+                    
+                    for selector in selectors:
+                        if not selector:
+                            continue
+                            
+                        add_to_cart_btn = soup.select_one(selector)
+                        if add_to_cart_btn:
+                            button_found = True
+                            button_text = add_to_cart_btn.text.strip().upper()
+                            button_state = add_to_cart_btn.get('data-button-state', '')
+                            button_class = ' '.join(add_to_cart_btn.get('class', []))
+                            is_disabled = 'disabled' in button_class or add_to_cart_btn.get('disabled') == 'disabled'
+                            
+                            logger.info(f"Found button with selector '{selector}'. Text: '{button_text}', State: '{button_state}', Disabled: {is_disabled}")
+                            
+                            if button_state == 'ADD_TO_CART' or ('ADD TO CART' in button_text and not is_disabled):
+                                is_in_stock = True
+                                break
+                    
+                    # Check for CloudFlare or other protection mechanisms
+                    if not button_found and (
+                        soup.select_one('#challenge-running') or
+                        soup.select_one('.cf-browser-verification') or
+                        'CF-' in str(response.headers) or
+                        'captcha' in html_content.lower()
+                    ):
+                        logger.warning(f"Detected protection mechanism for {gpu_name}. Consider using a proxy or reducing request frequency.")
+                    
+                    # If no button found, try looking for text patterns
+                    if not button_found:
+                        # Look for availability text in the page
+                        for availability_selector in ['.fulfillment-add-to-cart-button', '.priceView-hero-price', '.priceView-customer-price']:
+                            availability_element = soup.select_one(availability_selector)
+                            if availability_element:
+                                text = availability_element.text.strip().upper()
+                                if 'ADD TO CART' in text and 'SOLD OUT' not in text:
+                                    is_in_stock = True
+                                    button_found = True
+                                    break
+                except Exception as parse_error:
+                    logger.error(f"Error parsing HTML: {parse_error}")
+            elif response.status == 429 or response.status == 403:
+                logger.warning(f"Received status {response.status} - Rate limited or blocked. Backing off...")
+                retry_counts[gpu_name] += 1
+                gpu_check_delays[gpu_name] = min(300, DEFAULT_DELAY * (2 ** min(retry_counts[gpu_name], 5)))
+                return  # Exit early to avoid further processing
+            else:
+                logger.error(f"HTTP error: {response.status} when accessing {url}")
         
-        add_to_cart_btn = soup.find('button', class_='add-to-cart-button')
-        
-        if not add_to_cart_btn:
-            raise ValueError("Button not found")
+        # Method 2: If scraping failed, try the API approach
+        if not button_found and sku_id:
+            api_url = f"https://www.bestbuy.com/api/tcfb/model.json?paths=%5B%5B%22shop%22%2C%22buttonstate%22%2C%22v5%22%2C%22item%22%2C%22skus%22%2C{sku_id}%2C%22conditions%22%2C%22NONE%22%2C%22destinationZipCode%22%2C%22NONE%22%2C%22storeId%22%2C%22NONE%22%2C%22context%22%2C%22NONE%22%2C%22addAll%22%2C%22false%22%5D%5D&method=get"
             
-        button_state = add_to_cart_btn.get('data-button-state', '')
-        is_disabled = 'c-button-disabled' in add_to_cart_btn.get('class', [])
-        is_in_stock = button_state == 'ADD_TO_CART' and not is_disabled
+            try:
+                api_headers = get_random_headers()
+                api_headers['Accept'] = 'application/json'
+                
+                await asyncio.sleep(random.uniform(0.5, 1.5))  # Small delay between requests
+                
+                async with session.get(api_url, headers=api_headers, timeout=REQUEST_TIMEOUT) as api_response:
+                    if api_response.status == 200:
+                        api_data = await api_response.json()
+                        # Parse the API response to determine stock status
+                        if 'jsonGraph' in api_data and 'buttonstate' in api_data['jsonGraph']:
+                            button_state_data = api_data['jsonGraph']['buttonstate']
+                            for key, value in button_state_data.items():
+                                if sku_id in key and 'buttonstate' in key:
+                                    if value.get('value') == 'ADD_TO_CART':
+                                        is_in_stock = True
+                                        button_found = True
+                                        logger.info(f"API check indicates {gpu_name} is in stock")
+                                    break
+            except Exception as api_error:
+                logger.error(f"API check failed: {str(api_error)}")
         
+        if not button_found:
+            all_buttons = html_cache.get(url, {}).get('soup', BeautifulSoup('', 'html.parser')).find_all('button')
+            logger.warning(f"Found {len(all_buttons)} buttons on the page. First few buttons:")
+            for i, btn in enumerate(all_buttons[:5]):
+                logger.warning(f"Button {i+1}: {btn.get('class', 'No class')} - Text: {btn.text.strip()}")
+            
+            raise ValueError("Add to cart button not found with any selector")
+        
+        # Process stock status changes
         if is_in_stock:
             if not gpu_stock_status[gpu_name]:
                 gpu_stock_status[gpu_name] = True
@@ -136,19 +327,63 @@ async def check_availability(gpu_name, gpu_info, session):
         retry_counts[gpu_name] = 0
         
     except Exception as e:
-        # Implement exponential backoff on error
+        # Improved error handling
         retry_counts[gpu_name] += 1
-        backoff_delay = min(300, DEFAULT_DELAY * (2 ** retry_counts[gpu_name]))
+        backoff_delay = min(120, DEFAULT_DELAY * (2 ** min(retry_counts[gpu_name], 4)))
         gpu_check_delays[gpu_name] = backoff_delay
-        print(f"Error checking {gpu_name}: {str(e)}. Retrying in {backoff_delay}s")
+        logger.error(f"Error checking {gpu_name}: {str(e)}. Retrying in {backoff_delay}s")
+        
+        # If we've failed multiple times, try to save the HTML for debugging
+        if retry_counts[gpu_name] >= MAX_RETRIES:
+            try:
+                debug_file = f"debug_{gpu_name.replace(' ', '_')}_{int(time())}.html"
+                with open(debug_file, 'w', encoding='utf-8') as f:
+                    if url in html_cache:
+                        f.write(str(html_cache[url]['soup']))
+                logger.info(f"Saved debug HTML to {debug_file}")
+            except Exception as save_error:
+                logger.error(f"Could not save debug HTML: {save_error}")
 
 async def main_async():
-    print("Starting NVIDIA GPU availability checker...\nPress Ctrl+C to exit\n")
+    logger.info("Starting NVIDIA GPU availability checker...\nPress Ctrl+C to exit\n")
     last_check = {gpu: 0 for gpu in gpus}
     
-    # Create a shared session for all requests
-    async with aiohttp.ClientSession(headers=headers) as session:
+    # Load saved cookies
+    cookies_dict = load_cookies()
+    
+    # Create a cookie jar from the saved cookies
+    jar = aiohttp.CookieJar()
+    
+    # Create a base URL object
+    base_url = URL('https://www.bestbuy.com')
+    
+    # Add cookies to the jar with proper URL object
+    for name, value in cookies_dict.items():
+        jar.update_cookies({name: value}, base_url)
+    
+    # Create a session with cookies and trace_configs
+    session_kwargs = {
+        'cookie_jar': jar,
+        'timeout': aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+    }
+    
+    async with aiohttp.ClientSession(**session_kwargs) as session:
         try:
+            # First make a warmup request to the main site to get cookies
+            try:
+                await asyncio.sleep(random.uniform(1.0, 3.0))
+                async with session.get('https://www.bestbuy.com', headers=get_random_headers(), timeout=REQUEST_TIMEOUT) as response:
+                    if response.status == 200:
+                        new_cookies = extract_cookies_from_response(response)
+                        update_session_cookies(session, new_cookies)
+                        all_cookies = {}
+                        for cookie in session.cookie_jar:
+                            all_cookies[cookie.key] = cookie.value
+                        save_cookies(all_cookies)
+                        logger.info("Initialized session with cookies from bestbuy.com")
+            except Exception as e:
+                logger.warning(f"Warmup request failed: {e}")
+                
             while True:
                 current_time = time()
                 
@@ -173,12 +408,18 @@ async def main_async():
                         tasks.append(check_availability(gpu_name, gpu_info, session))
                         last_check[gpu_name] = current_time
                 
-                # Run all checks in parallel
+                # Run all checks with some concurrency control
                 if tasks:
-                    await asyncio.gather(*tasks)
+                    # Run checks with some concurrency control (3 at a time)
+                    for i in range(0, len(tasks), 3):
+                        batch = tasks[i:i+3]
+                        await asyncio.gather(*batch)
+                        if i + 3 < len(tasks):
+                            # Add small delay between batches
+                            await asyncio.sleep(random.uniform(2.0, 5.0))
                     
         except KeyboardInterrupt:
-            print("\n\nExiting checker...")
+            logger.info("\n\nExiting checker...")
             exit(0)
 
 def main():
