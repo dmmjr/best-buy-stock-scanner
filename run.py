@@ -23,15 +23,22 @@ load_dotenv()
 init()
 
 # Set up logging
+log_handlers = [logging.StreamHandler()]  # Always log to console
+
+if ENABLE_LOGGING:
+    log_handlers.append(logging.FileHandler(LOG_FILE))
+    
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOGGING_LEVEL),
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler()
-    ]
+    handlers=log_handlers
 )
 logger = logging.getLogger("stock_scanner")
+
+if ENABLE_LOGGING:
+    logger.info(f"File logging enabled - logs will be saved to {LOG_FILE}")
+else:
+    logger.info("File logging disabled")
 
 # Configuration  
 discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
@@ -72,8 +79,17 @@ USER_AGENTS = load_user_agents()
 HEADERS = load_headers()
 
 def get_random_headers(header_type="common"):
-    """Generate headers with a random user agent"""
-    user_agent = random.choice(USER_AGENTS)
+    """Generate headers with randomized values to appear more human-like"""
+    # Only apply randomization if enabled in settings
+    if not RANDOMIZE_HEADERS:
+        if header_type in HEADERS:
+            headers = HEADERS[header_type].copy()
+        else:
+            headers = HEADERS["common"].copy()
+        
+        # Add a random user agent
+        headers["User-Agent"] = random.choice(USER_AGENTS)
+        return headers
     
     # Get the base headers template
     if header_type in HEADERS:
@@ -82,7 +98,45 @@ def get_random_headers(header_type="common"):
         headers = HEADERS["common"].copy()
     
     # Add the user agent
+    user_agent = random.choice(USER_AGENTS)
     headers["User-Agent"] = user_agent
+    
+    # Get the randomization options
+    random_options = HEADERS.get("random_options", {})
+    
+    # Apply random values from options
+    for header, values in random_options.items():
+        if header == "optional_headers" or header == "sec-ch-ua-versions":
+            continue  # These are handled specially
+            
+        if isinstance(values, list) and values:
+            headers[header] = random.choice(values)
+    
+    # Apply optional headers (with randomized chance of inclusion)
+    optional_headers = random_options.get("optional_headers", {})
+    for header, values in optional_headers.items():
+        if random.random() > 0.3 and values:  # 70% chance to include optional header
+            headers[header] = random.choice(values)
+    
+    # Apply browser-specific headers based on user agent
+    ua_versions = random_options.get("sec-ch-ua-versions", {})
+    
+    # Chrome-specific headers
+    if "Chrome" in user_agent and "Firefox" not in user_agent and "Edg" not in user_agent:
+        if "Chrome" in ua_versions and ua_versions["Chrome"]:
+            version = random.choice(ua_versions["Chrome"])
+            headers["sec-ch-ua"] = f"\"Chromium\";v=\"{version}\", \"Google Chrome\";v=\"{version}\""
+    
+    # Firefox-specific headers
+    elif "Firefox" in user_agent:
+        if random.random() > 0.3 and "TE" not in headers:  # 70% chance
+            headers["TE"] = "trailers"
+    
+    # Edge-specific headers
+    elif "Edg" in user_agent:
+        if "Chrome" in ua_versions and ua_versions["Chrome"]:
+            version = random.choice(ua_versions["Chrome"])
+            headers["sec-ch-ua"] = f"\"Chromium\";v=\"{version}\", \"Microsoft Edge\";v=\"{version}\""
     
     return headers
 

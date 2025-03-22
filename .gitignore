@@ -1,4 +1,8 @@
+__pycache__/
 .venv
 .env
-stock_Scanner.log
-bestbuy_cookies.json
+
+# Files
+/stock_Scanner.log
+/log.txt
+/bestbuy_cookies.json

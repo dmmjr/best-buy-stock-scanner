@@ -1,14 +1,18 @@
-import os
 from colorama import Fore, Style
 
 # File paths
 COOKIES_FILE = 'bestbuy_cookies.json'
 USER_AGENTS_FILE = 'user_agents.json'
 HEADERS_FILE = 'headers.json'
-LOG_FILE = 'stock_scanner.log'
+LOG_FILE = 'log.txt'  # Renamed from stock_scanner.log to log.txt
+
+# Logging settings
+ENABLE_LOGGING = True  # Set to False to disable file logging
+LOGGING_LEVEL = 'INFO'  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 # Request settings
 REQUEST_TIMEOUT = 15  # Increased timeout for slow connections
+RANDOMIZE_HEADERS = True  # Enable deep header randomization
 
 # Timing settings
 DEFAULT_DELAY = 30    # Default delay between checks (seconds)
