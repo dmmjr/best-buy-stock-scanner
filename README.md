@@ -1,3 +1,5 @@
+A script to scan specific product pages and notify you when they come back in stock.
+
 # Create and activate virtual environment
 ```
 python -m venv venv
