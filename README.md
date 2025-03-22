@@ -17,7 +17,7 @@ pip install requirements.txt
 DISCORD_WEBHOOK_URL=12345678
 DISCORD_USER_IDS=123,987 (supports multiple separated by comma)
 
-# GPU Configuration
+# Product Configuration
 PRODUCT_1_NAME=Product name
 PRODUCT_1_URL=https://www.bestbuy.com/site/...
 
