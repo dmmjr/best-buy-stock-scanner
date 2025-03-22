@@ -4,7 +4,7 @@ A web scraper that scans specific product pages at Bestbuy.com, and notifies you
 ```
 python -m venv venv
 venv\Scripts\activate
-```S
+```
 
 # Install requirements
 ```
